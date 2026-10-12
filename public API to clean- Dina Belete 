@@ -1,0 +1,896 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/amranbelete/DS2002FA26/blob/main/public%20API%20to%20clean-%20Dina%20Belete%20\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "RRhwe9fWG8ca"
+      },
+      "source": [
+        "# DS2002 · Public API to Clean Table\n",
+        "\n",
+        "**Lab — 2026-10-09 · Fall 2026**  \n",
+        "\n",
+        "---"
+      ],
+      "id": "RRhwe9fWG8ca"
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "UdcmBvUOG8cb"
+      },
+      "source": [
+        "## Lab 07 — Public API to Clean Table\n",
+        "\n",
+        "Build the weather-ingestion function you will actually reuse on the midterm. It has to pull real data, survive a flaky network, say plainly when it fell back to sample data, and hand back a table that is safe to join.\n",
+        "\n",
+        "The last requirement is the one people skip. A function that returns *something* no matter what is worse than one that fails loudly, because the failure ends up in your findings instead of your console."
+      ],
+      "id": "UdcmBvUOG8cb"
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "eeqcQudYG8cb"
+      },
+      "source": [
+        "### Part 1 — a fetch you can trust\n",
+        "\n",
+        "**TODO:** finish `get_weather`. Requirements:\n",
+        "\n",
+        "- sets a timeout\n",
+        "- retries on 429 and 5xx with an increasing delay\n",
+        "- raises immediately on 400 or 404 — those are your bug, not theirs\n",
+        "- returns a DataFrame from the `daily` block\n",
+        "\n",
+        "You wrote this shape in Wednesday's studio. Rebuild it from memory if you can."
+      ],
+      "id": "eeqcQudYG8cb"
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "metadata": {
+        "id": "4lpfIM6sG8cc"
+      },
+      "outputs": [],
+      "source": [
+        "import requests, pandas as pd, time\n",
+        "\n",
+        "BASE = 'https://archive-api.open-meteo.com/v1/archive'\n",
+        "RETRY_STATUSES = {429, 500, 502, 503, 504}\n",
+        "\n",
+        "def get_weather(start, end, lat=38.03, lon=-78.51, tries=3):\n",
+        "    \"\"\"Daily max temperature and total precipitation for a date range.\"\"\"\n",
+        "    params = {\n",
+        "        'latitude': lat, 'longitude': lon,\n",
+        "        'start_date': start, 'end_date': end,\n",
+        "        'daily': 'temperature_2m_max,precipitation_sum',\n",
+        "        'timezone': 'America/New_York',\n",
+        "    }\n",
+        "   # TODO: loop up to `tries` times\n",
+        "    for attempt in range(tries):\n",
+        "        # TODO: request with a timeout; return pd.DataFrame(r.json()['daily']) on 200\n",
+        "        r = requests.get(BASE, params=params, timeout=10)\n",
+        "        if r.status_code == 200:\n",
+        "            return pd.DataFrame(r.json()['daily'])\n",
+        "        # TODO: raise on a status that is not in RETRY_STATUSES\n",
+        "        if r.status_code not in RETRY_STATUSES:\n",
+        "            r.raise_for_status()\n",
+        "        # TODO: otherwise sleep (increasing each time) and try again\n",
+        "        time.sleep(2 ** attempt)\n",
+        "    # TODO: raise if every attempt failed\n",
+        "    raise RuntimeError(f\"get_weather failed after {tries} attempts\")"
+      ],
+      "id": "4lpfIM6sG8cc"
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "uVbbCXmeG8cc"
+      },
+      "source": [
+        "### Part 2 — two home weekends\n",
+        "\n",
+        "Pull weather for **2026-09-05** and **2026-10-03**. One range covering both is fine and is one request instead of two — be nice to free APIs.\n",
+        "\n",
+        "If the call genuinely fails, use the fallback in Part 3, but you must record that you did."
+      ],
+      "id": "uVbbCXmeG8cc"
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 2,
+      "metadata": {
+        "id": "ueezaalQG8cc"
+      },
+      "outputs": [],
+      "source": [
+        "# TODO: call get_weather once for a range that spans both dates,\n",
+        "weather = get_weather('2026-09-05', '2026-10-03')\n",
+        "#       then keep just the two dates you care about\n",
+        "\n",
+        "home_weekends = weather[weather['time'].isin(['2026-09-05', '2026-10-03'])]\n",
+        "used_fallback = False"
+      ],
+      "id": "ueezaalQG8cc"
+    },
+    {
+      "cell_type": "code",
+      "source": [],
+      "metadata": {
+        "id": "9IrENS2gIdgC"
+      },
+      "id": "9IrENS2gIdgC",
+      "execution_count": 2,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "27naPC4RG8cd"
+      },
+      "source": [
+        "### Part 3 — the fallback, labelled as a fallback\n",
+        "\n",
+        "Sample values so the notebook still runs without a network. The important part is the `source` column: whoever reads your results can tell which rows are real."
+      ],
+      "id": "27naPC4RG8cd"
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 3,
+      "metadata": {
+        "id": "mW68msOdG8cd"
+      },
+      "outputs": [],
+      "source": [
+        "FALLBACK = pd.DataFrame({\n",
+        "    'time': ['2026-09-05', '2026-10-03'],\n",
+        "    'temperature_2m_max': [30.1, 18.4],\n",
+        "    'precipitation_sum': [0.0, 22.5],\n",
+        "})\n",
+        "\n",
+        "# TODO: if you used the fallback, set used_fallback = True and build `wx` from FALLBACK\n",
+        "if used_fallback:\n",
+        "    wx = FALLBACK.copy()\n",
+        "# TODO: add a 'source' column to `wx` -- 'open-meteo' or 'fallback sample'\n",
+        "wx = weather[weather['time'].isin(['2026-09-05', '2026-10-03'])].copy()"
+      ],
+      "id": "mW68msOdG8cd"
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "QSRwk37oG8cd"
+      },
+      "source": [
+        "### Part 4 — make it joinable\n",
+        "\n",
+        "**TODO:** produce a frame with a real datetime column named `date`, plus `temp_max`, `precip_mm`, and `source`. Rename the API's column names to yours — your pipeline should not inherit somebody else's naming."
+      ],
+      "id": "QSRwk37oG8cd"
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 4,
+      "metadata": {
+        "id": "bBdL_0fVG8ce",
+        "outputId": "a990699f-ceb0-49fa-b7b4-524d99a58d13",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 112
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "        date  temp_max  precip_mm      source\n",
+              "0 2026-09-05      29.4        2.5  open-meteo\n",
+              "1 2026-10-03      22.0       14.7  open-meteo"
+            ],
+            "text/html": [
+              "\n",
+              "  <div id=\"df-485c5d04-50a4-41cc-819d-2cce2c47867a\" class=\"colab-df-container\">\n",
+              "    <div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>date</th>\n",
+              "      <th>temp_max</th>\n",
+              "      <th>precip_mm</th>\n",
+              "      <th>source</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>0</th>\n",
+              "      <td>2026-09-05</td>\n",
+              "      <td>29.4</td>\n",
+              "      <td>2.5</td>\n",
+              "      <td>open-meteo</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>1</th>\n",
+              "      <td>2026-10-03</td>\n",
+              "      <td>22.0</td>\n",
+              "      <td>14.7</td>\n",
+              "      <td>open-meteo</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>\n",
+              "    <div class=\"colab-df-buttons\">\n",
+              "\n",
+              "  <div class=\"colab-df-container\">\n",
+              "    <button class=\"colab-df-convert\" onclick=\"convertToInteractive('df-485c5d04-50a4-41cc-819d-2cce2c47867a')\"\n",
+              "            title=\"Convert this dataframe to an interactive table.\"\n",
+              "            style=\"display:none;\">\n",
+              "\n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\" viewBox=\"0 -960 960 960\">\n",
+              "    <path d=\"M120-120v-720h720v720H120Zm60-500h600v-160H180v160Zm220 220h160v-160H400v160Zm0 220h160v-160H400v160ZM180-400h160v-160H180v160Zm440 0h160v-160H620v160ZM180-180h160v-160H180v160Zm440 0h160v-160H620v160Z\"/>\n",
+              "  </svg>\n",
+              "    </button>\n",
+              "\n",
+              "  <style>\n",
+              "    .colab-df-container {\n",
+              "      display:flex;\n",
+              "      gap: 12px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert {\n",
+              "      background-color: #E8F0FE;\n",
+              "      border: none;\n",
+              "      border-radius: 50%;\n",
+              "      cursor: pointer;\n",
+              "      display: none;\n",
+              "      fill: #1967D2;\n",
+              "      height: 32px;\n",
+              "      padding: 0 0 0 0;\n",
+              "      width: 32px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert:hover {\n",
+              "      background-color: #E2EBFA;\n",
+              "      box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "      fill: #174EA6;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-buttons div {\n",
+              "      margin-bottom: 4px;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert {\n",
+              "      background-color: #3B4455;\n",
+              "      fill: #D2E3FC;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert:hover {\n",
+              "      background-color: #434B5C;\n",
+              "      box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "      filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "      fill: #FFFFFF;\n",
+              "    }\n",
+              "  </style>\n",
+              "\n",
+              "    <script>\n",
+              "      const buttonEl =\n",
+              "        document.querySelector('#df-485c5d04-50a4-41cc-819d-2cce2c47867a button.colab-df-convert');\n",
+              "      buttonEl.style.display =\n",
+              "        google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "      async function convertToInteractive(key) {\n",
+              "        const element = document.querySelector('#df-485c5d04-50a4-41cc-819d-2cce2c47867a');\n",
+              "        const dataTable =\n",
+              "          await google.colab.kernel.invokeFunction('convertToInteractive',\n",
+              "                                                    [key], {});\n",
+              "        if (!dataTable) return;\n",
+              "\n",
+              "        const docLinkHtml = 'Like what you see? Visit the ' +\n",
+              "          '<a target=\"_blank\" href=https://colab.research.google.com/notebooks/data_table.ipynb>data table notebook</a>'\n",
+              "          + ' to learn more about interactive tables.';\n",
+              "        element.innerHTML = '';\n",
+              "        dataTable['output_type'] = 'display_data';\n",
+              "        await google.colab.output.renderOutput(dataTable, element);\n",
+              "        const docLink = document.createElement('div');\n",
+              "        docLink.innerHTML = docLinkHtml;\n",
+              "        element.appendChild(docLink);\n",
+              "      }\n",
+              "    </script>\n",
+              "  </div>\n",
+              "\n",
+              "\n",
+              "  <div id=\"id_b583c0a8-5cd8-429b-9dc4-65af9be154e3\">\n",
+              "    <style>\n",
+              "      .colab-df-generate {\n",
+              "        background-color: #E8F0FE;\n",
+              "        border: none;\n",
+              "        border-radius: 50%;\n",
+              "        cursor: pointer;\n",
+              "        display: none;\n",
+              "        fill: #1967D2;\n",
+              "        height: 32px;\n",
+              "        padding: 0 0 0 0;\n",
+              "        width: 32px;\n",
+              "      }\n",
+              "\n",
+              "      .colab-df-generate:hover {\n",
+              "        background-color: #E2EBFA;\n",
+              "        box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "        fill: #174EA6;\n",
+              "      }\n",
+              "\n",
+              "      [theme=dark] .colab-df-generate {\n",
+              "        background-color: #3B4455;\n",
+              "        fill: #D2E3FC;\n",
+              "      }\n",
+              "\n",
+              "      [theme=dark] .colab-df-generate:hover {\n",
+              "        background-color: #434B5C;\n",
+              "        box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "        filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "        fill: #FFFFFF;\n",
+              "      }\n",
+              "    </style>\n",
+              "    <button class=\"colab-df-generate\" onclick=\"generateWithVariable('wx')\"\n",
+              "            title=\"Generate code using this dataframe.\"\n",
+              "            style=\"display:none;\">\n",
+              "\n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\"viewBox=\"0 0 24 24\"\n",
+              "       width=\"24px\">\n",
+              "    <path d=\"M7,19H8.4L18.45,9,17,7.55,7,17.6ZM5,21V16.75L18.45,3.32a2,2,0,0,1,2.83,0l1.4,1.43a1.91,1.91,0,0,1,.58,1.4,1.91,1.91,0,0,1-.58,1.4L9.25,21ZM18.45,9,17,7.55Zm-12,3A5.31,5.31,0,0,0,4.9,8.1,5.31,5.31,0,0,0,1,6.5,5.31,5.31,0,0,0,4.9,4.9,5.31,5.31,0,0,0,6.5,1,5.31,5.31,0,0,0,8.1,4.9,5.31,5.31,0,0,0,12,6.5,5.46,5.46,0,0,0,6.5,12Z\"/>\n",
+              "  </svg>\n",
+              "    </button>\n",
+              "    <script>\n",
+              "      (() => {\n",
+              "      const buttonEl =\n",
+              "        document.querySelector('#id_b583c0a8-5cd8-429b-9dc4-65af9be154e3 button.colab-df-generate');\n",
+              "      buttonEl.style.display =\n",
+              "        google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "      buttonEl.onclick = () => {\n",
+              "        google.colab.notebook.generateWithVariable('wx');\n",
+              "      }\n",
+              "      })();\n",
+              "    </script>\n",
+              "  </div>\n",
+              "\n",
+              "    </div>\n",
+              "  </div>\n"
+            ],
+            "application/vnd.google.colaboratory.intrinsic+json": {
+              "type": "dataframe",
+              "variable_name": "wx",
+              "summary": "{\n  \"name\": \"wx\",\n  \"rows\": 2,\n  \"fields\": [\n    {\n      \"column\": \"date\",\n      \"properties\": {\n        \"dtype\": \"date\",\n        \"min\": \"2026-09-05 00:00:00\",\n        \"max\": \"2026-10-03 00:00:00\",\n        \"num_unique_values\": 2,\n        \"samples\": [\n          \"2026-10-03 00:00:00\",\n          \"2026-09-05 00:00:00\"\n        ],\n        \"semantic_type\": \"\",\n        \"description\": \"\"\n      }\n    },\n    {\n      \"column\": \"temp_max\",\n      \"properties\": {\n        \"dtype\": \"number\",\n        \"std\": 5.23259018078045,\n        \"min\": 22.0,\n        \"max\": 29.4,\n        \"num_unique_values\": 2,\n        \"samples\": [\n          22.0,\n          29.4\n        ],\n        \"semantic_type\": \"\",\n        \"description\": \"\"\n      }\n    },\n    {\n      \"column\": \"precip_mm\",\n      \"properties\": {\n        \"dtype\": \"number\",\n        \"std\": 8.626702730475879,\n        \"min\": 2.5,\n        \"max\": 14.7,\n        \"num_unique_values\": 2,\n        \"samples\": [\n          14.7,\n          2.5\n        ],\n        \"semantic_type\": \"\",\n        \"description\": \"\"\n      }\n    },\n    {\n      \"column\": \"source\",\n      \"properties\": {\n        \"dtype\": \"string\",\n        \"num_unique_values\": 1,\n        \"samples\": [\n          \"open-meteo\"\n        ],\n        \"semantic_type\": \"\",\n        \"description\": \"\"\n      }\n    }\n  ]\n}"
+            }
+          },
+          "metadata": {},
+          "execution_count": 4
+        }
+      ],
+      "source": [
+        "# TODO\n",
+        "if 'source' not in wx.columns:\n",
+        "    wx['source'] = 'fallback sample' if used_fallback else 'open-meteo'\n",
+        "\n",
+        "wx = wx.rename(columns={\n",
+        "    'time': 'date',\n",
+        "    'temperature_2m_max': 'temp_max',\n",
+        "    'precipitation_sum': 'precip_mm',\n",
+        "})[['date', 'temp_max', 'precip_mm', 'source']]\n",
+        "\n",
+        "wx['date'] = pd.to_datetime(wx['date'])\n",
+        "wx = wx.sort_values('date').reset_index(drop=True)\n",
+        "wx"
+      ],
+      "id": "bBdL_0fVG8ce"
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "print(wx.columns.tolist())"
+      ],
+      "metadata": {
+        "id": "00cB3wCTKzOm",
+        "outputId": "7660b4eb-0f04-48e3-80e0-c2e7f43ed76d",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "id": "00cB3wCTKzOm",
+      "execution_count": 5,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "['date', 'temp_max', 'precip_mm', 'source']\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "nchkft5IG8ce"
+      },
+      "source": [
+        "### Part 5 — validate before you use it\n",
+        "\n",
+        "This is the habit that separates a pipeline from a script. State what must be true, and find out here rather than three cells later inside a join.\n",
+        "\n",
+        "**TODO:** uncomment and make them pass."
+      ],
+      "id": "nchkft5IG8ce"
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 6,
+      "metadata": {
+        "id": "jnUiSWYLG8ce",
+        "outputId": "8d7269e3-74df-415c-f3ba-274eb5e1be7e",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "weather table is safe to join.\n"
+          ]
+        }
+      ],
+      "source": [
+        "assert list(wx.columns) == ['date', 'temp_max', 'precip_mm', 'source']\n",
+        "assert len(wx) == 2, f'expected 2 rows, got {len(wx)}'\n",
+        "assert pd.api.types.is_datetime64_any_dtype(wx['date'])\n",
+        "assert wx['precip_mm'].notna().all(), 'missing precipitation'\n",
+        "assert (wx['precip_mm'] >= 0).all(), 'negative rainfall is not a thing'\n",
+        "print('weather table is safe to join.')"
+      ],
+      "id": "jnUiSWYLG8ce"
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "QY2a5mgqG8ce"
+      },
+      "source": [
+        "### Part 6 — answer the question\n",
+        "\n",
+        "**TODO:** which of the two dates was wetter, and by how much? Print a sentence a vendor could read, not just a number."
+      ],
+      "id": "QY2a5mgqG8ce"
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 7,
+      "metadata": {
+        "id": "jahvKwvfG8ce",
+        "outputId": "524492f3-2d33-4741-cee2-86ee3e6c0d32",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Of the two home weekends, October 03, 2026 got more rain: 14.7mm, compared to just 2.5mm on September 05, 2026. That's 12.2mm more precipitation.\n"
+          ]
+        }
+      ],
+      "source": [
+        "rainy_row = wx.sort_values('precip_mm', ascending=False).iloc[0]\n",
+        "dry_row = wx.sort_values('precip_mm', ascending=False).iloc[-1]\n",
+        "gap = rainy_row['precip_mm'] - dry_row['precip_mm']\n",
+        "\n",
+        "print(\n",
+        "    f\"Of the two home weekends, {rainy_row['date']:%B %d, %Y} got more rain: \"\n",
+        "    f\"{rainy_row['precip_mm']:.1f}mm, compared to just {dry_row['precip_mm']:.1f}mm \"\n",
+        "    f\"on {dry_row['date']:%B %d, %Y}. That's {gap:.1f}mm more precipitation.\"\n",
+        ")"
+      ],
+      "id": "jahvKwvfG8ce"
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "7ZuNtyk3G8ce"
+      },
+      "source": [
+        "### Part 7 — cite it\n",
+        "\n",
+        "**TODO:** print the endpoint, the coordinates, the date range, when you pulled it, and whether the data is real or fallback."
+      ],
+      "id": "7ZuNtyk3G8ce"
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 8,
+      "metadata": {
+        "id": "o_MPxT29G8ce",
+        "outputId": "bb89e15c-e1c6-4627-ec4f-a4757862393c",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "--- Data citation ---\n",
+            "Endpoint:     https://archive-api.open-meteo.com/v1/archive\n",
+            "Coordinates:  latitude 38.03, longitude -78.51 (Charlottesville, VA)\n",
+            "Date range:   2026-09-05 through 2026-10-03\n",
+            "Pulled on:    2026-10-12 03:51\n",
+            "Data status:  REAL (pulled live from the API)\n"
+          ]
+        }
+      ],
+      "source": [
+        "# TODO\n",
+        "from datetime import datetime\n",
+        "\n",
+        "start_date = wx['date'].min().strftime('%Y-%m-%d')\n",
+        "end_date = wx['date'].max().strftime('%Y-%m-%d')\n",
+        "pulled_at = datetime.now().strftime('%Y-%m-%d %H:%M')\n",
+        "data_status = (\n",
+        "    'FALLBACK SAMPLE (not a real pull)'\n",
+        "    if used_fallback\n",
+        "    else 'REAL (pulled live from the API)'\n",
+        ")\n",
+        "\n",
+        "print('--- Data citation ---')\n",
+        "print(f'Endpoint:     {BASE}')\n",
+        "print(f'Coordinates:  latitude 38.03, longitude -78.51 (Charlottesville, VA)')\n",
+        "print(f'Date range:   {start_date} through {end_date}')\n",
+        "print(f'Pulled on:    {pulled_at}')\n",
+        "print(f'Data status:  {data_status}')"
+      ],
+      "id": "o_MPxT29G8ce"
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "EW2iDKeAG8ce"
+      },
+      "source": [
+        "### Write-up\n",
+        "\n",
+        "Suppose `get_weather` returned an empty DataFrame on failure instead of raising. Walk through what happens next: you merge it onto 200 days of sales and chart rain against revenue. What does the chart show, and why would nobody catch it?\n",
+        "\n",
+        "\n",
+        "If get_weather returned an empty DataFrame instead of raising, the merge would still succeed, since pandas doesn't treat an empty table as an error. With a left merge, all 200 days of sales stay but every rain value is NaN. With an inner merge, every row is dropped. The chart would then come out blank or show only a few stray points, because plotting libraries skip NaN values without complaint. It can easily be read as a real finding, like \"rain has little effect on revenue,\" when the truth is that the rain data is missing. Nobody would catch it because nothing fails: no exception, no warning, just a chart that renders. Only someone who checks the row or NaN count after the merge, or who knows those days were rainy, would notice. That's why raising an exception is better: it stops the pipeline at the source instead of letting bad data quietly reach a business decision."
+      ],
+      "id": "EW2iDKeAG8ce"
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "91D5E3yGG8ce"
+      },
+      "source": [
+        "### Stretch\n",
+        "\n",
+        "Pull the same two dates for a second location — Orlando is at roughly `28.54, -81.38` — and put both cities in one long-format frame with a `city` column. That is the exact shape the midterm needs when you compare stores in different places."
+      ],
+      "id": "91D5E3yGG8ce"
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 9,
+      "metadata": {
+        "id": "jbiqgZH3G8cf",
+        "outputId": "39b405f9-81c2-4641-9f8f-fa5aaff57883",
+        "colab": {
+          "base_uri": "https://localhost:8080/",
+          "height": 174
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "              city       date  temp_max  precip_mm      source\n",
+              "0  Charlottesville 2026-09-05      29.4        2.5  open-meteo\n",
+              "1  Charlottesville 2026-10-03      22.0       14.7  open-meteo\n",
+              "2          Orlando 2026-09-05      32.1        3.9  open-meteo\n",
+              "3          Orlando 2026-10-03      30.4       14.5  open-meteo"
+            ],
+            "text/html": [
+              "\n",
+              "  <div id=\"df-b7465d81-09f3-4cc5-8d8d-fe3c355712aa\" class=\"colab-df-container\">\n",
+              "    <div>\n",
+              "<style scoped>\n",
+              "    .dataframe tbody tr th:only-of-type {\n",
+              "        vertical-align: middle;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe tbody tr th {\n",
+              "        vertical-align: top;\n",
+              "    }\n",
+              "\n",
+              "    .dataframe thead th {\n",
+              "        text-align: right;\n",
+              "    }\n",
+              "</style>\n",
+              "<table border=\"1\" class=\"dataframe\">\n",
+              "  <thead>\n",
+              "    <tr style=\"text-align: right;\">\n",
+              "      <th></th>\n",
+              "      <th>city</th>\n",
+              "      <th>date</th>\n",
+              "      <th>temp_max</th>\n",
+              "      <th>precip_mm</th>\n",
+              "      <th>source</th>\n",
+              "    </tr>\n",
+              "  </thead>\n",
+              "  <tbody>\n",
+              "    <tr>\n",
+              "      <th>0</th>\n",
+              "      <td>Charlottesville</td>\n",
+              "      <td>2026-09-05</td>\n",
+              "      <td>29.4</td>\n",
+              "      <td>2.5</td>\n",
+              "      <td>open-meteo</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>1</th>\n",
+              "      <td>Charlottesville</td>\n",
+              "      <td>2026-10-03</td>\n",
+              "      <td>22.0</td>\n",
+              "      <td>14.7</td>\n",
+              "      <td>open-meteo</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>2</th>\n",
+              "      <td>Orlando</td>\n",
+              "      <td>2026-09-05</td>\n",
+              "      <td>32.1</td>\n",
+              "      <td>3.9</td>\n",
+              "      <td>open-meteo</td>\n",
+              "    </tr>\n",
+              "    <tr>\n",
+              "      <th>3</th>\n",
+              "      <td>Orlando</td>\n",
+              "      <td>2026-10-03</td>\n",
+              "      <td>30.4</td>\n",
+              "      <td>14.5</td>\n",
+              "      <td>open-meteo</td>\n",
+              "    </tr>\n",
+              "  </tbody>\n",
+              "</table>\n",
+              "</div>\n",
+              "    <div class=\"colab-df-buttons\">\n",
+              "\n",
+              "  <div class=\"colab-df-container\">\n",
+              "    <button class=\"colab-df-convert\" onclick=\"convertToInteractive('df-b7465d81-09f3-4cc5-8d8d-fe3c355712aa')\"\n",
+              "            title=\"Convert this dataframe to an interactive table.\"\n",
+              "            style=\"display:none;\">\n",
+              "\n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\" viewBox=\"0 -960 960 960\">\n",
+              "    <path d=\"M120-120v-720h720v720H120Zm60-500h600v-160H180v160Zm220 220h160v-160H400v160Zm0 220h160v-160H400v160ZM180-400h160v-160H180v160Zm440 0h160v-160H620v160ZM180-180h160v-160H180v160Zm440 0h160v-160H620v160Z\"/>\n",
+              "  </svg>\n",
+              "    </button>\n",
+              "\n",
+              "  <style>\n",
+              "    .colab-df-container {\n",
+              "      display:flex;\n",
+              "      gap: 12px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert {\n",
+              "      background-color: #E8F0FE;\n",
+              "      border: none;\n",
+              "      border-radius: 50%;\n",
+              "      cursor: pointer;\n",
+              "      display: none;\n",
+              "      fill: #1967D2;\n",
+              "      height: 32px;\n",
+              "      padding: 0 0 0 0;\n",
+              "      width: 32px;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-convert:hover {\n",
+              "      background-color: #E2EBFA;\n",
+              "      box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "      fill: #174EA6;\n",
+              "    }\n",
+              "\n",
+              "    .colab-df-buttons div {\n",
+              "      margin-bottom: 4px;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert {\n",
+              "      background-color: #3B4455;\n",
+              "      fill: #D2E3FC;\n",
+              "    }\n",
+              "\n",
+              "    [theme=dark] .colab-df-convert:hover {\n",
+              "      background-color: #434B5C;\n",
+              "      box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "      filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "      fill: #FFFFFF;\n",
+              "    }\n",
+              "  </style>\n",
+              "\n",
+              "    <script>\n",
+              "      const buttonEl =\n",
+              "        document.querySelector('#df-b7465d81-09f3-4cc5-8d8d-fe3c355712aa button.colab-df-convert');\n",
+              "      buttonEl.style.display =\n",
+              "        google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "      async function convertToInteractive(key) {\n",
+              "        const element = document.querySelector('#df-b7465d81-09f3-4cc5-8d8d-fe3c355712aa');\n",
+              "        const dataTable =\n",
+              "          await google.colab.kernel.invokeFunction('convertToInteractive',\n",
+              "                                                    [key], {});\n",
+              "        if (!dataTable) return;\n",
+              "\n",
+              "        const docLinkHtml = 'Like what you see? Visit the ' +\n",
+              "          '<a target=\"_blank\" href=https://colab.research.google.com/notebooks/data_table.ipynb>data table notebook</a>'\n",
+              "          + ' to learn more about interactive tables.';\n",
+              "        element.innerHTML = '';\n",
+              "        dataTable['output_type'] = 'display_data';\n",
+              "        await google.colab.output.renderOutput(dataTable, element);\n",
+              "        const docLink = document.createElement('div');\n",
+              "        docLink.innerHTML = docLinkHtml;\n",
+              "        element.appendChild(docLink);\n",
+              "      }\n",
+              "    </script>\n",
+              "  </div>\n",
+              "\n",
+              "\n",
+              "  <div id=\"id_160897b1-92b7-43fd-803b-ba669c6ca049\">\n",
+              "    <style>\n",
+              "      .colab-df-generate {\n",
+              "        background-color: #E8F0FE;\n",
+              "        border: none;\n",
+              "        border-radius: 50%;\n",
+              "        cursor: pointer;\n",
+              "        display: none;\n",
+              "        fill: #1967D2;\n",
+              "        height: 32px;\n",
+              "        padding: 0 0 0 0;\n",
+              "        width: 32px;\n",
+              "      }\n",
+              "\n",
+              "      .colab-df-generate:hover {\n",
+              "        background-color: #E2EBFA;\n",
+              "        box-shadow: 0px 1px 2px rgba(60, 64, 67, 0.3), 0px 1px 3px 1px rgba(60, 64, 67, 0.15);\n",
+              "        fill: #174EA6;\n",
+              "      }\n",
+              "\n",
+              "      [theme=dark] .colab-df-generate {\n",
+              "        background-color: #3B4455;\n",
+              "        fill: #D2E3FC;\n",
+              "      }\n",
+              "\n",
+              "      [theme=dark] .colab-df-generate:hover {\n",
+              "        background-color: #434B5C;\n",
+              "        box-shadow: 0px 1px 3px 1px rgba(0, 0, 0, 0.15);\n",
+              "        filter: drop-shadow(0px 1px 2px rgba(0, 0, 0, 0.3));\n",
+              "        fill: #FFFFFF;\n",
+              "      }\n",
+              "    </style>\n",
+              "    <button class=\"colab-df-generate\" onclick=\"generateWithVariable('by_city')\"\n",
+              "            title=\"Generate code using this dataframe.\"\n",
+              "            style=\"display:none;\">\n",
+              "\n",
+              "  <svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\"viewBox=\"0 0 24 24\"\n",
+              "       width=\"24px\">\n",
+              "    <path d=\"M7,19H8.4L18.45,9,17,7.55,7,17.6ZM5,21V16.75L18.45,3.32a2,2,0,0,1,2.83,0l1.4,1.43a1.91,1.91,0,0,1,.58,1.4,1.91,1.91,0,0,1-.58,1.4L9.25,21ZM18.45,9,17,7.55Zm-12,3A5.31,5.31,0,0,0,4.9,8.1,5.31,5.31,0,0,0,1,6.5,5.31,5.31,0,0,0,4.9,4.9,5.31,5.31,0,0,0,6.5,1,5.31,5.31,0,0,0,8.1,4.9,5.31,5.31,0,0,0,12,6.5,5.46,5.46,0,0,0,6.5,12Z\"/>\n",
+              "  </svg>\n",
+              "    </button>\n",
+              "    <script>\n",
+              "      (() => {\n",
+              "      const buttonEl =\n",
+              "        document.querySelector('#id_160897b1-92b7-43fd-803b-ba669c6ca049 button.colab-df-generate');\n",
+              "      buttonEl.style.display =\n",
+              "        google.colab.kernel.accessAllowed ? 'block' : 'none';\n",
+              "\n",
+              "      buttonEl.onclick = () => {\n",
+              "        google.colab.notebook.generateWithVariable('by_city');\n",
+              "      }\n",
+              "      })();\n",
+              "    </script>\n",
+              "  </div>\n",
+              "\n",
+              "    </div>\n",
+              "  </div>\n"
+            ],
+            "application/vnd.google.colaboratory.intrinsic+json": {
+              "type": "dataframe",
+              "variable_name": "by_city",
+              "summary": "{\n  \"name\": \"by_city\",\n  \"rows\": 4,\n  \"fields\": [\n    {\n      \"column\": \"city\",\n      \"properties\": {\n        \"dtype\": \"string\",\n        \"num_unique_values\": 2,\n        \"samples\": [\n          \"Orlando\",\n          \"Charlottesville\"\n        ],\n        \"semantic_type\": \"\",\n        \"description\": \"\"\n      }\n    },\n    {\n      \"column\": \"date\",\n      \"properties\": {\n        \"dtype\": \"date\",\n        \"min\": \"2026-09-05 00:00:00\",\n        \"max\": \"2026-10-03 00:00:00\",\n        \"num_unique_values\": 2,\n        \"samples\": [\n          \"2026-10-03 00:00:00\",\n          \"2026-09-05 00:00:00\"\n        ],\n        \"semantic_type\": \"\",\n        \"description\": \"\"\n      }\n    },\n    {\n      \"column\": \"temp_max\",\n      \"properties\": {\n        \"dtype\": \"number\",\n        \"std\": 4.458232086077769,\n        \"min\": 22.0,\n        \"max\": 32.1,\n        \"num_unique_values\": 4,\n        \"samples\": [\n          22.0,\n          30.4\n        ],\n        \"semantic_type\": \"\",\n        \"description\": \"\"\n      }\n    },\n    {\n      \"column\": \"precip_mm\",\n      \"properties\": {\n        \"dtype\": \"number\",\n        \"std\": 6.607066923630586,\n        \"min\": 2.5,\n        \"max\": 14.7,\n        \"num_unique_values\": 4,\n        \"samples\": [\n          14.7,\n          14.5\n        ],\n        \"semantic_type\": \"\",\n        \"description\": \"\"\n      }\n    },\n    {\n      \"column\": \"source\",\n      \"properties\": {\n        \"dtype\": \"category\",\n        \"num_unique_values\": 1,\n        \"samples\": [\n          \"open-meteo\"\n        ],\n        \"semantic_type\": \"\",\n        \"description\": \"\"\n      }\n    }\n  ]\n}"
+            }
+          },
+          "metadata": {},
+          "execution_count": 9
+        }
+      ],
+      "source": [
+        "# stretch\n",
+        "LOCATIONS = [\n",
+        "    ('Charlottesville', 38.03, -78.51),\n",
+        "    ('Orlando', 28.54, -81.38),\n",
+        "]\n",
+        "TARGET_DATES = ['2026-09-05', '2026-10-03']\n",
+        "\n",
+        "def pull_city(name, lat, lon):\n",
+        "    \"\"\"Return a labelled frame for one city, using the fallback if the pull fails.\"\"\"\n",
+        "    try:\n",
+        "        df = get_weather(TARGET_DATES[0], TARGET_DATES[1], lat=lat, lon=lon)\n",
+        "        df = df[df['time'].isin(TARGET_DATES)]\n",
+        "        origin = 'open-meteo'\n",
+        "    except (requests.RequestException, RuntimeError) as err:\n",
+        "        print(f'{name}: live pull failed ({err}); using fallback sample')\n",
+        "        df = FALLBACK\n",
+        "        origin = 'fallback sample'\n",
+        "    return df.assign(city=name, source=origin)\n",
+        "\n",
+        "by_city = (\n",
+        "    pd.concat([pull_city(*loc) for loc in LOCATIONS], ignore_index=True)\n",
+        "    .rename(columns={\n",
+        "        'time': 'date',\n",
+        "        'temperature_2m_max': 'temp_max',\n",
+        "        'precipitation_sum': 'precip_mm',\n",
+        "    })\n",
+        "    .assign(date=lambda d: pd.to_datetime(d['date']))\n",
+        "    [['city', 'date', 'temp_max', 'precip_mm', 'source']]\n",
+        ")\n",
+        "by_city"
+      ],
+      "id": "jbiqgZH3G8cf"
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "name": "python",
+      "version": "3.x"
+    },
+    "colab": {
+      "provenance": [],
+      "include_colab_link": true
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
